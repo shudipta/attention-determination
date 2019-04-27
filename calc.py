@@ -231,62 +231,90 @@ def cmp_scan_lines(line: ScanLine):
 
 inp = list(map(float, input("enter face point f(x, y): ").split()))
 face = Vector(inp[0], inp[1])
-#
-# inp = list(map(float, input("enter face view angles point p1(x, y), p2(x, y): ").split()))
-# p1 = Vector(inp[0], inp[1])
-# p2 = Vector(inp[2], inp[3])
-# view_ang1 = (p1 - face).angle_with_x_axis()
-# view_ang2 = (p2 - face).angle_with_x_axis()
-# attention_dir = (view_ang1 + view_ang2) / 2.0
-#
+
+inp = list(map(float, input("enter face view angles point p1(x, y), p2(x, y): ").split()))
+p1 = Vector(inp[0], inp[1])
+p2 = Vector(inp[2], inp[3])
+view_ang1 = (p1 - face).angle_with_x_axis()
+view_ang2 = (p2 - face).angle_with_x_axis()
+attention_dir = (view_ang1 + view_ang2) / 2.0
+
 num_objs = int(input('number of objects: '))
 
 objs = []
 scan_lines = []
+print("enter lower-left point (x, y), width and height of the objs")
 for i in range(num_objs):
-    inp = list(map(float, input("enter lower-left point (x, y), width and height of i'th obj...").split()))
-    x_i = inp[0], y_i = inp[1], width_i = inp[2], height_i = inp[3]
+    inp = list(map(float, input("{0}'th obj: ".format(i)).split()))
+    x_i = inp[0]
+    y_i = inp[1]
+    width_i = inp[2]
+    height_i = inp[3]
     objs.append(Obj(x_i, y_i, width_i, height_i, i))
     objs[i].append_scan_lines(scan_lines, face)
 
 scan_lines.sort(key=cmp_scan_lines)
 
-p1 = Pt(3, 5)
-print(p1)
-p2 = Pt()
-print(p2)
-# print(p1.__getattribute__(p1, p1.__slots__))
-# print(p1.__str__)
-# p1.print()
-# p1.z = 8
-# p2.print()
+for i in range(2 * num_objs):
+    if i > 0:
+        nearest_idx = -1
+        min_dist = 1e9
+        for j in range(num_objs):
+            if scan_lines[i].ang < objs[j].enter_ang + EPS or scan_lines[i - 1].ang + EPS > objs[j].leave_ang:
+                continue
 
-print(PI)
-print(EPS)
+            face_distance = objs[j].face_dist(face)
+            if min_dist > face_distance + EPS:
+                min_dist = face_distance
+                nearest_idx = j
 
-print(is_equal(5.00000000000000, 4.9999999))
+        if nearest_idx == -1:
+            continue
 
-print('======================')
-# Same as def funcvar(x): return x + 1
-funcvar = lambda x: x + 1
-print(funcvar(1))
+        o1 = scan_lines[i - 1].obj_idx
+        o2 = scan_lines[i].obj_idx
+        i1 = scan_lines[i - 1].pt_idx
+        i2 = scan_lines[i].pt_idx
+        p1 = objs[o1].pts[i1]
+        p2 = objs[o2].pts[i2]
+        objs[nearest_idx].visible_area += polygon_area(clip_obj(face, p1, p2, objs[nearest_idx].pts))
 
+total_attention = 0.0
+for i in range(num_objs):
+    objs[i].attention = 1.0
+    objs[i].attention /= objs[i].attention_dist(face,
+                                                (face + Vector(math.cos(attention_dir), math.sin(attention_dir))))
+    objs[i].attention /= objs[i].face_dist(face)
+    objs[i].attention *= objs[i].visible_area / (objs[i].area())
 
-# an_int and a_string are optional, they have default values
-# if one is not passed (2 and "A default string", respectively).
+    total_attention += objs[i].attention
 
+for i in range(num_objs):
+    objs[i].attention *= (100.0 / total_attention)
 
-def passing_example(a_list, an_int, a_string="A default string"):
-    a_list.append("A new item")
-    an_int = 4
-    return a_list, an_int, a_string
+    print("percentage attention of {0}'th obj = {1}%".format(i, objs[i].attention))
 
-
-my_list = [1, 2, 3]
-my_int = 10
-# my_list_cp = [my_list]
-print(passing_example(my_list.copy(), my_int))
-
-print(my_list)
-
-print(my_int)
+########################
+#     test case 01     #
+########################
+#      0 0             #
+#      1 2 -1 2        #
+#      5               #
+#      -6 32 10 5      #
+#      8 33 3 2        #
+#      -10 40 5 3      #
+#      5 37 5 3        #
+#      1 45 16 5       #
+########################
+#     test case 02     #
+########################
+#      0 0             #
+#      1 2 -1 2        #
+#      6               #
+#      -6 32 10 5      #
+#      8 33 3 2        #
+#      -10 40 5 3      #
+#      5 37 5 3        #
+#      1 45 16 5       #
+#      -5 20 12 5      #
+########################
